@@ -8,5 +8,6 @@ Tecnologias utilizadas:
 - H2 (Base de dados)
 - Swagger (Documentação)
 
-Realizado o deploy no keroku:
+Realizado o deploy no keroku, vai lá fazer uns testes e me fala o que achou, aceito sugestões e críticas =)
+
 https://ksantannap-cliente-service.herokuapp.com
