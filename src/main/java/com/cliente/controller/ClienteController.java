@@ -1,7 +1,12 @@
 package com.cliente.controller;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +33,8 @@ import com.cliente.util.ClienteUtil;
 @RequestMapping("/api/cliente")
 public class ClienteController {
 
+	private static final Logger logger = LogManager.getLogger(ClienteController.class);
+
 	@Autowired
 	private ClienteRepository repository;
 
@@ -38,7 +45,36 @@ public class ClienteController {
 	 */
 	@RequestMapping(method = RequestMethod.GET)
 	public ResponseEntity<?> findAll() {
-		return new ResponseEntity<Iterable<ClienteEntity>>(repository.findAll(), HttpStatus.OK);
+
+		logger.info("Buscando todos os clientes...");
+
+		try {
+
+			Iterable<ClienteEntity> clientesEncontrados = repository.findAll();
+
+			List<ClienteEntity> listClientes = StreamSupport.stream(clientesEncontrados.spliterator(), false)
+					.collect(Collectors.toList());
+
+			if (listClientes.isEmpty()) {
+
+				logger.info("Nenhum cliente foi encontrado");
+
+				return new ResponseEntity<String>("Nenhum cliente foi encontrado", HttpStatus.NOT_FOUND);
+			} else {
+
+				logger.info(String.format("Encontrado %s cliente(s)", listClientes.size()));
+
+				return new ResponseEntity<List<ClienteEntity>>(listClientes, HttpStatus.OK);
+			}
+
+		} catch (Exception e) {
+
+			String erro = String.format("Erro ao buscar os clientes [%s]", e.getMessage());
+			logger.error(erro, e);
+
+			return new ResponseEntity<String>(erro, HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
 	}
 
 	/**
@@ -51,21 +87,40 @@ public class ClienteController {
 	@RequestMapping(value = "/{id}", method = RequestMethod.GET)
 	public ResponseEntity<?> findById(@PathVariable Long id) {
 
-		Optional<ClienteEntity> optional = repository.findById(id);
+		logger.info(String.format("Buscando o cliente com ID [%s]", id));
 
-		if (optional.isPresent()) {
-			return new ResponseEntity<ClienteEntity>(optional.get(), HttpStatus.OK);
-		} else {
-			return new ResponseEntity<String>("Cliente não encontrado", HttpStatus.NOT_FOUND);
+		try {
+
+			Optional<ClienteEntity> optional = repository.findById(id);
+
+			if (optional.isPresent()) {
+
+				logger.info(String.format("Encontrado o cliente %s", optional.get()));
+
+				return new ResponseEntity<ClienteEntity>(optional.get(), HttpStatus.OK);
+			} else {
+
+				logger.info("Não foi encontrado o cliente solicitado...");
+
+				return new ResponseEntity<String>("Cliente não encontrado", HttpStatus.NOT_FOUND);
+			}
+
+		} catch (Exception e) {
+
+			String erro = String.format("Não foi possível encontrar o cliente ID[%s] (%s)", id, e.getMessage());
+			logger.error(erro, e);
+
+			return new ResponseEntity<String>(erro, HttpStatus.INTERNAL_SERVER_ERROR);
+
 		}
-
 	}
 
 	/**
 	 * Utilizado uma classe chamada ClienteForm para não dar poder à requisição de
 	 * inserir o ID que é tratado pelo JPA
 	 * 
-	 * Caso insira o cliente com sucesso retorna o response code 201 e o cliente com ID gerado pelo JPA
+	 * Caso insira o cliente com sucesso retorna o response code 201 e o cliente com
+	 * ID gerado pelo JPA
 	 * 
 	 * @param clienteForm
 	 * @return
@@ -73,11 +128,27 @@ public class ClienteController {
 	@RequestMapping(method = RequestMethod.POST)
 	public ResponseEntity<?> insertCliente(@RequestBody ClienteForm clienteForm) {
 
-		ClienteEntity clienteEntity = ClienteUtil.transformToClienteEntity(clienteForm);
+		logger.info("Iniciando o processo de salvar o cliente");
 
-		repository.save(clienteEntity);
+		try {
 
-		return new ResponseEntity<ClienteEntity>(clienteEntity, HttpStatus.CREATED);
+			ClienteEntity clienteEntity = ClienteUtil.transformToClienteEntity(clienteForm);
+
+			repository.save(clienteEntity);
+
+			logger.info("Cliente salvo com sucesso!");
+
+			return new ResponseEntity<ClienteEntity>(clienteEntity, HttpStatus.CREATED);
+
+		} catch (Exception e) {
+
+			String erro = String.format("Não foi possível encontrar o cliente (%s)", e.getMessage());
+			logger.error(erro, e);
+
+			return new ResponseEntity<String>(erro, HttpStatus.INTERNAL_SERVER_ERROR);
+
+		}
+
 	}
 
 	/**
@@ -90,14 +161,32 @@ public class ClienteController {
 	@RequestMapping(value = "/{id}", method = RequestMethod.DELETE)
 	public ResponseEntity<?> deleteCliente(@PathVariable Long id) {
 
-		if (repository.existsById(id)) {
+		logger.info(String.format("Iniciando processo de deletar o cliente com ID[%s]", id));
 
-			repository.deleteById(id);
-			return new ResponseEntity<String>("Cliente removido!", HttpStatus.OK);
+		try {
 
-		} else {
+			if (repository.existsById(id)) {
 
-			return new ResponseEntity<String>("Cliente não foi encontrado para ser removido", HttpStatus.NOT_FOUND);
+				repository.deleteById(id);
+
+				logger.info("Cliente removido com sucesso!");
+
+				return new ResponseEntity<String>("Cliente removido!", HttpStatus.OK);
+
+			} else {
+
+				logger.info("Cliente não foi encontrado para ser removido");
+
+				return new ResponseEntity<String>("Cliente não foi encontrado para ser removido", HttpStatus.NOT_FOUND);
+
+			}
+
+		} catch (Exception e) {
+
+			String erro = String.format("Não foi possível deletar com cliente ID[%s] (%s)", id, e.getMessage());
+			logger.error(erro, e);
+
+			return new ResponseEntity<String>(erro, HttpStatus.INTERNAL_SERVER_ERROR);
 
 		}
 
@@ -118,18 +207,36 @@ public class ClienteController {
 	@RequestMapping(value = "/{id}", method = RequestMethod.PUT)
 	public ResponseEntity<?> atualizarCliente(@PathVariable Long id, @RequestBody ClienteForm clienteForm) {
 
-		if (repository.existsById(id)) {
+		logger.info(String.format("Iniciando processo de atualizar o cliente com ID[%s]", id));
+		
+		try {
+			
+			if (repository.existsById(id)) {
 
-			ClienteEntity clienteEntity = ClienteUtil.transformToClienteEntity(clienteForm);
-			clienteEntity.setIdCliente(id);
+				ClienteEntity clienteEntity = ClienteUtil.transformToClienteEntity(clienteForm);
+				clienteEntity.setIdCliente(id);
 
-			repository.save(clienteEntity);
+				repository.save(clienteEntity);
 
-			return new ResponseEntity<ClienteEntity>(clienteEntity, HttpStatus.OK);
+				logger.info("Cliente atualizado com sucesso!");
+				
+				return new ResponseEntity<ClienteEntity>(clienteEntity, HttpStatus.OK);
 
-		} else {
+			} else {
 
-			return new ResponseEntity<String>("Não foi encontrado o cliente para ser atualizado", HttpStatus.NOT_FOUND);
+				logger.info("Cliente não foi encontrado para ser atualizado");
+				
+				return new ResponseEntity<String>("Não foi encontrado o cliente para ser atualizado",
+						HttpStatus.NOT_FOUND);
+
+			}
+
+		} catch (Exception e) {
+
+			String erro = String.format("Não foi possível deletar com cliente ID[%s] (%s)", id, e.getMessage());
+			logger.error(erro, e);
+
+			return new ResponseEntity<String>(erro, HttpStatus.INTERNAL_SERVER_ERROR);
 
 		}
 	}
